@@ -18,30 +18,40 @@
     <div class="col-12">
         <div class="card card-custom">
             <div class="card-body">
-                <form method="get" class="row g-3">
-                    <div class="col-md-4">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-3">
                         <label class="form-label">تصفية حسب العائلة</label>
                         <select name="family" class="form-select form-control-custom">
                             <option value="">كل العائلات</option>
                             {% for family in families %}
                             <option value="{{ family['family_name'] }}" {% if family_filter == family['family_name'] %}selected{% endif %}>
-                                {{ family['family_name'] }}
+                                {{ family['family_name'] }} ({{ family['count'] }})
                             </option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">تصفية حسب المركز انتخابي</label>
                         <select name="center" class="form-select form-control-custom">
                             <option value="">كل المراكز</option>
                             {% for center in centers %}
                             <option value="{{ center['electoral_center'] }}" {% if center_filter == center['electoral_center'] %}selected{% endif %}>
-                                {{ center['electoral_center'] }}
+                                {{ center['electoral_center'] }} ({{ center['count'] }})
                             </option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4 d-flex align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">تصفية حسب الحالة</label>
+                        <select name="status" class="form-select form-control-custom">
+                            <option value="">كل الحالات</option>
+                            <option value="positive" {% if status_filter == 'positive' %}selected{% endif %}>مضمون</option>
+                            <option value="uncertain" {% if status_filter == 'uncertain' %}selected{% endif %}>غير مضمون</option>
+                            <option value="negative" {% if status_filter == 'negative' %}selected{% endif %}>لم ينخب</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>قيد الانتظار</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <button type="submit" class="btn btn-primary-custom w-100">
                             <i class="fas fa-filter ms-1"></i>
                             تصفية
@@ -58,12 +68,12 @@
         <div class="card card-custom">
             <div class="card-header-custom">
                 <i class="fas fa-clipboard-check me-2"></i>
-                اختر اللجنة
+                توزيع الناخبين على لجنة
             </div>
             <div class="card-body">
                 <form method="post" action="{{ url_for('assign_task') }}">
                     <div class="mb-3">
-                        <label class="form-label">اللجنة المكلفة</label>
+                        <label class="form-label fw-bold">اللجنة المكلفة</label>
                         <select name="committee_id" class="form-select form-control-custom" required>
                             <option value="">اختر لجنة...</option>
                             {% for committee in committees %}
@@ -71,13 +81,28 @@
                             {% endfor %}
                         </select>
                     </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label">اختر الناخبين للمهمة</label>
+                        <label class="form-label fw-bold">اختيار الناخبين:</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-success" id="selectAllBtn">
+                                <i class="fas fa-check-square"></i> تحديد الكل
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="deselectAllBtn">
+                                <i class="fas fa-square"></i> إلغاء تحديد الكل
+                            </button>
+                        </div>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="selectAll">
-                            <label class="form-check-label" for="selectAll">تحديد الكل</label>
+                            <label class="form-check-label fw-bold" for="selectAll">تحديد كل الناخبين المُصفين</label>
                         </div>
                     </div>
+                    
+                    <div class="alert alert-info alert-custom">
+                        <i class="fas fa-info-circle me-1"></i>
+                        عدد الناخبين المختارين: <span id="selectedCount" class="fw-bold">0</span> / {{ voters|length }}
+                    </div>
+                    
                     <button type="submit" class="btn btn-success-custom w-100">
                         <i class="fas fa-user-plus ms-1"></i>
                         توزيع على اللجنة
@@ -120,14 +145,20 @@
                 <i class="fas fa-users me-2"></i>
                 الناخبين المتاحين للتوزيع
                 <span class="badge bg-white text-primary ms-2">{{ voters|length }}</span>
+                {% if family_filter or center_filter or status_filter %}
+                <span class="badge bg-warning text-dark ms-1">
+                    <i class="fas fa-filter"></i>
+                    مُصفين
+                </span>
+                {% endif %}
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                     <table class="table table-custom table-hover mb-0">
-                        <thead class="sticky-top">
+                        <thead class="sticky-top bg-light">
                             <tr>
                                 <th width="50">
-                                    <input type="checkbox" class="form-check-input voter-checkbox" data-bulk="true">
+                                    <input type="checkbox" class="form-check-input" id="headerCheckbox">
                                 </th>
                                 <th>الاسم بالكامل</th>
                                 <th>اسم العائلة</th>
@@ -177,7 +208,11 @@
                             <tr>
                                 <td colspan="6" class="text-center text-muted py-5">
                                     <i class="fas fa-users fa-2x mb-3 d-block text-muted"></i>
+                                    {% if family_filter or center_filter or status_filter %}
+                                    لا توجد ناخبين تطابق معايير التصفية
+                                    {% else %}
                                     لا توجد ناخبين متاحين. أضف ناخبين أولاً
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -200,19 +235,65 @@
 
 {% block scripts %}
 <script>
-    // Select all checkboxes
-    document.getElementById('selectAll').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.voter-checkbox:not([data-bulk="true"])');
-        checkboxes.forEach(cb => cb.checked = this.checked);
+    // Update selected count
+    function updateSelectedCount() {
+        const checkboxes = document.querySelectorAll('.voter-checkbox:checked');
+        document.getElementById('selectedCount').textContent = checkboxes.length;
+        
+        // Update header checkbox state
+        const allCheckboxes = document.querySelectorAll('.voter-checkbox');
+        const headerCheckbox = document.getElementById('headerCheckbox');
+        if (allCheckboxes.length === 0) {
+            headerCheckbox.checked = false;
+            headerCheckbox.indeterminate = false;
+        } else if (checkboxes.length === allCheckboxes.length) {
+            headerCheckbox.checked = true;
+            headerCheckbox.indeterminate = false;
+        } else if (checkboxes.length > 0) {
+            headerCheckbox.checked = false;
+            headerCheckbox.indeterminate = true;
+        } else {
+            headerCheckbox.checked = false;
+            headerCheckbox.indeterminate = false;
+        }
+    }
+    
+    // Select All button
+    document.getElementById('selectAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.voter-checkbox').forEach(cb => cb.checked = true);
+        document.getElementById('selectAll').checked = true;
+        updateSelectedCount();
     });
     
-    // Bulk checkbox
-    document.querySelectorAll('.voter-checkbox[data-bulk="true"]').forEach(cb => {
-        cb.addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.voter-checkbox:not([data-bulk="true"])');
-            const allChecked = Array.from(checkboxes).every(c => c.checked);
-            document.getElementById('selectAll').checked = allChecked;
-        });
+    // Deselect All button
+    document.getElementById('deselectAllBtn').addEventListener('click', function() {
+        document.querySelectorAll('.voter-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('selectAll').checked = false;
+        updateSelectedCount();
     });
+    
+    // Header checkbox
+    document.getElementById('headerCheckbox').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.voter-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        document.getElementById('selectAll').checked = this.checked;
+        updateSelectedCount();
+    });
+    
+    // Select All from form checkbox
+    document.getElementById('selectAll').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.voter-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        document.getElementById('headerCheckbox').checked = this.checked;
+        updateSelectedCount();
+    });
+    
+    // Individual checkbox changes
+    document.querySelectorAll('.voter-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Initial count
+    updateSelectedCount();
 </script>
 {% endblock %}

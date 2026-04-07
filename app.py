@@ -368,12 +368,22 @@ def tasks():
     
     family_filter = request.args.get('family', '')
     center_filter = request.args.get('center', '')
+    status_filter = request.args.get('status', '')
     
-    # Get committees for assignment
-    committees = conn.execute('SELECT * FROM committees ORDER BY name').fetchall()
+    # Get committees for assignment with voter counts
+    committees = conn.execute('''
+        SELECT c.*, COUNT(v.id) as voters_count 
+        FROM committees c 
+        LEFT JOIN voters v ON v.committee_id = c.id 
+        GROUP BY c.id 
+        ORDER BY c.name
+    ''').fetchall()
     
-    # Get voters without committee or filtered
-    query = 'SELECT v.*, c.name as committee_name FROM voters v LEFT JOIN committees c ON v.committee_id = c.id WHERE 1=1'
+    # Get voters with filters
+    query = '''SELECT v.*, c.name as committee_name 
+               FROM voters v 
+               LEFT JOIN committees c ON v.committee_id = c.id 
+               WHERE 1=1'''
     params = []
     
     if family_filter:
@@ -382,14 +392,31 @@ def tasks():
     if center_filter:
         query += ' AND v.electoral_center = ?'
         params.append(center_filter)
+    if status_filter:
+        query += ' AND v.status = ?'
+        params.append(status_filter)
     
     query += ' ORDER BY v.family_name, v.electoral_center'
     
     voters_list = conn.execute(query, params).fetchall()
     
-    # Get unique families and centers
-    families = conn.execute('SELECT DISTINCT family_name FROM voters WHERE family_name IS NOT NULL AND family_name != "" ORDER BY family_name').fetchall()
-    centers = conn.execute('SELECT DISTINCT electoral_center FROM voters WHERE electoral_center IS NOT NULL AND electoral_center != "" ORDER BY electoral_center').fetchall()
+    # Get unique families with counts
+    families = conn.execute('''
+        SELECT family_name as family_name, COUNT(*) as count 
+        FROM voters 
+        WHERE family_name IS NOT NULL AND family_name != "" 
+        GROUP BY family_name 
+        ORDER BY family_name
+    ''').fetchall()
+    
+    # Get unique centers with counts
+    centers = conn.execute('''
+        SELECT electoral_center as electoral_center, COUNT(*) as count 
+        FROM voters 
+        WHERE electoral_center IS NOT NULL AND electoral_center != "" 
+        GROUP BY electoral_center 
+        ORDER BY electoral_center
+    ''').fetchall()
     
     conn.close()
     
@@ -399,7 +426,8 @@ def tasks():
                            families=families,
                            centers=centers,
                            family_filter=family_filter,
-                           center_filter=center_filter)
+                           center_filter=center_filter,
+                           status_filter=status_filter)
 
 @app.route('/assign_task', methods=['POST'])
 def assign_task():
