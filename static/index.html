@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام متابعة انتخبات البلدية 2026</title>
+    
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    
+
+        <!-- Edit Member Modal -->
+        <div v-if="showEditMemberModal" class="modal-overlay" @click.self="showEditMemberModal = false">
+            <div class="modal-content p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">تعديل بيانات عضو اللجنة</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
+                        <input v-model="editMember.name" type="text" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
+                        <input v-model="editMember.email" type="email" class="w-full">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الجديدة (اتركها فارغة إذا لا تريد تغييرها)</label>
+                        <input v-model="editMember.password" type="password" class="w-full">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">العائلة المشرف عليها</label>
+                            <select v-model="editMember.family_name" class="w-full">
+                                <option value="">كل العائلات</option>
+                                <option v-for="f in families" :key="f" :value="f">{{ f }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">المركز الانتخابي</label>
+                            <select v-model="editMember.electoral_center" class="w-full">
+                                <option value="">كل المراكز</option>
+                                <option v-for="c in centers" :key="c" :value="c">{{ c }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="saveMemberChanges" class="btn btn-primary flex-1">
+                            حفظ التغييرات
+                        </button>
+                        <button @click="showEditMemberModal = false" class="btn bg-gray-200 flex-1">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'arabic': ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        'election-blue': '#1e40af',
+                        'election-green': '#059669',
+                        'election-orange': '#f97316',
+                        'election-red': '#dc2626',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+        }
+        
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: block;
+            text-decoration: none;
+        }
+        
+        .nav-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+        }
+        
+        .table-row {
+            transition: all 0.2s ease;
+        }
+        
+        .table-row:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+        
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+        
+        .stat-total::before { background: #3b82f6; }
+        .stat-guaranteed::before { background: #10b981; }
+        .stat-unguaranteed::before { background: #f97316; }
+        .stat-notvoted::before { background: #dc2626; }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-pending { background: #e2e8f0; color: #475569; }
+        .status-guaranteed { background: #d1fae5; color: #059669; }
+        .status-unguaranteed { background: #fed7aa; color: #ea580c; }
+        .status-not_voted { background: #fee2e2; color: #dc2626; }
+        
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 32rem;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header v-if="isLoggedIn" class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-800">نظام متابعة انتخبات البلدية 2026</h1>
+                        <p class="text-sm text-gray-500">Municipality Election Tracking System</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center gap-2">
+                    <a v-for="item in navItems" :key="item.id" 
+                       @click="currentView = item.id"
+                       :class="['nav-item', currentView === item.id ? 'active' : 'text-gray-600 hover:text-gray-800']"
+                       class="nav-item">
+                        {{ item.label }}
+                    </a>
+                </nav>
+
+                <button v-if="isLoggedIn" @click="logout" class="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm">
+                    <span>تسجيل خروج</span>
+                </button>
+                
+                <!-- Mobile Menu Button -->
+                <button @click="showMobileMenu = !showMobileMenu" class="md:hidden p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Mobile Menu -->
+        <div v-if="showMobileMenu" class="md:hidden bg-white border-b border-gray-200 px-4 py-2">
+            <a v-for="item in navItems" :key="item.id" 
+               @click="currentView = item.id; showMobileMenu = false"
+               :class="['block py-2 px-4 rounded', currentView === item.id ? 'bg-blue-600 text-white' : 'text-gray-600']">
+                {{ item.label }}
+            </a>
+        </div>
+        
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-8">
+            <!-- Login View -->
+            <div v-if="!isLoggedIn" class="flex items-center justify-center min-h-[60vh]">
+                <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800">تسجيل الدخول</h2>
+                        <p class="text-gray-500 mt-2">نظام متابعة انتخبات البلدية 2026</p>
+                    </div>
+                    
+                    <form @submit.prevent="login" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
+                            <input v-model="loginForm.email" type="email" required
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="email@example.com">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+                            <input v-model="loginForm.password" type="password" required
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="••••••••">
+                        </div>
+                        <p v-if="loginError" class="text-red-600 text-sm">{{ loginError }}</p>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">
+                            تسجيل دخول
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            
+            <!-- Dashboard View -->
+            <div v-else-if="currentView === 'dashboard' && isLoggedIn" class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800">لوحة التحكم - Dashboard</h2>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="card stat-card stat-total p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">إجمالي الناخبين</p>
+                                <p class="text-3xl font-bold text-gray-800">{{ stats.total_electors }}</p>
+                            </div>
+                            <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 14H3m10 0v-2m0 2v-2m0 2v-2m0 2H3m10 0h5" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card stat-card stat-guaranteed p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">المضمونين</p>
+                                <p class="text-3xl font-bold text-green-600">{{ stats.guaranteed }}</p>
+                                <p class="text-sm text-green-600">{{ stats.guaranteed_percentage }}%</p>
+                            </div>
+                            <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card stat-card stat-unguaranteed p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">غير المضمونين</p>
+                                <p class="text-3xl font-bold text-orange-600">{{ stats.unguaranteed }}</p>
+                            </div>
+                            <div class="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card stat-card stat-notvoted p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">لم يصوتوا</p>
+                                <p class="text-3xl font-bold text-red-600">{{ stats.not_voted }}</p>
+                            </div>
+                            <div class="w-14 h-14 bg-red-100 rounded-xl flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">توزيع الحالات</h3>
+                        <div class="h-64">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">الحالة حسب العائلة</h3>
+                        <div class="h-64">
+                            <canvas id="familyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Updates -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">آخر التحديثات</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-600">الاسم</th>
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-600">العائلة</th>
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-600">المركز</th>
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-600">الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="elector in recentElectors" :key="elector.id" class="table-row border-b border-gray-100">
+                                    <td class="py-3 px-4">{{ elector.full_name }}</td>
+                                    <td class="py-3 px-4">{{ elector.family_name }}</td>
+                                    <td class="py-3 px-4">{{ elector.electoral_center }}</td>
+                                    <td class="py-3 px-4">
+                                        <span :class="['status-badge', 'status-' + elector.status]">
+                                            {{ getStatusLabel(elector.status) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr v-if="recentElectors.length === 0">
+                                    <td colspan="4" class="py-8 text-center text-gray-500">
+                                        لا توجد بيانات. قم باستيراد ملف Excel للبدء.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Electors View -->
+            <div v-else-if="currentView === 'electors' && isLoggedIn" class="space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <h2 class="text-2xl font-bold text-gray-800">الناخبين</h2>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <input v-model="electorsSearch" type="text" placeholder="بحث بالاسم أو الرمز..." class="w-64">
+                        <select v-model="electorsFilterFamily" class="w-40">
+                            <option value="">كل العائلات</option>
+                            <option v-for="f in families" :key="f" :value="f">{{ f }}</option>
+                        </select>
+                        <select v-model="electorsFilterStatus" class="w-40">
+                            <option value="">كل الحالات</option>
+                            <option value="pending">في الانتظار</option>
+                            <option value="guaranteed">مضمون</option>
+                            <option value="unguaranteed">غير مضمون</option>
+                            <option value="not_voted">لم يصوت</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="card overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الاسم الكامل</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">العائلة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الرمز electionي</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">المركز electionي</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الحالة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="elector in filteredElectors" :key="elector.id" class="table-row border-b border-gray-100">
+                                <td class="py-3 px-4">{{ elector.full_name }}</td>
+                                <td class="py-3 px-4">{{ elector.family_name }}</td>
+                                <td class="py-3 px-4 font-mono text-sm">{{ elector.electoral_code }}</td>
+                                <td class="py-3 px-4">{{ elector.electoral_center }}</td>
+                                <td class="py-3 px-4">
+                                    <span :class="['status-badge', 'status-' + elector.status]">
+                                        {{ getStatusLabel(elector.status) }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button @click="openStatusModal(elector)" class="btn btn-primary text-sm">
+                                        تحديث الحالة
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredElectors.length === 0">
+                                <td colspan="6" class="py-8 text-center text-gray-500">
+                                    لا توجد نتائج
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Import View -->
+            <div v-else-if="currentView === 'import' && isLoggedIn" class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800">استيراد من Excel</h2>
+                
+                <div class="card p-8">
+                    <div class="text-center space-y-6">
+                        <div class="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-800">رفع ملف Excel</h3>
+                            <p class="text-gray-500 mt-2">قم برفع ملف Excel يحتوي على أعمدة:</p>
+                            <ul class="text-sm text-gray-600 mt-4 space-y-1">
+                                <li>• <strong>col 1:</strong> الاسم الكامل</li>
+                                <li>• <strong>col 2:</strong> اسم العائلة</li>
+                                <li>• <strong>col 3:</strong> الرمز electionي</li>
+                                <li>• <strong>col 4:</strong> المركز electionي</li>
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <label class="btn btn-primary cursor-pointer inline-block">
+                                <input type="file" @change="handleFileUpload" accept=".xlsx,.xls" class="hidden">
+                                اختيار ملف
+                            </label>
+                            <p v-if="importFile" class="mt-2 text-sm text-gray-600">{{ importFile.name }}</p>
+                        </div>
+                        
+                        <div v-if="importResult" class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-semibold text-gray-800 mb-2">نتيجة الاستيراد:</h4>
+                            <p class="text-green-600">تم إضافة: {{ importResult.imported }} ناخب</p>
+                            <p class="text-blue-600">تم تحديث: {{ importResult.updated }} ناخب</p>
+                            <p v-if="importResult.errors.length > 0" class="text-red-600 mt-2">
+                                أخطاء: {{ importResult.errors.length }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Assignment View -->
+            <div v-else-if="currentView === 'assignment' && isLoggedIn" class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800">توزيع المهام</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Committee Members -->
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">أعضاء اللجان</h3>
+                        
+                        <div class="space-y-3">
+                            <div v-for="member in committeeMembers" :key="member.id" 
+                                 @click="selectedMember = member"
+                                 :class="['p-4 rounded-lg border-2 cursor-pointer transition-all', selectedMember?.id === member.id ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold text-gray-800">{{ member.name }}</p>
+                                        <p class="text-sm text-gray-500">{{ member.family_name || 'كل العائلات' }}</p>
+                                    </div>
+                                    <div class="text-left">
+                                        <p class="text-sm text-gray-500">المكلف بهم</p>
+                                        <p class="text-xl font-bold text-blue-600">{{ member.assigned || 0 }}</p>
+                                    <button @click.stop="openEditMemberModal(member)" class="text-blue-600 hover:text-blue-800 text-sm mr-2">تعديل</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button @click="showAddMemberModal = true" class="btn btn-primary w-full">
+                                + إضافة عضو لجنة
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Assignment Controls -->
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">خيارات التوزيع</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب العائلة</label>
+                                <select v-model="assignmentFilterFamily" class="w-full">
+                                    <option value="">كل العائلات</option>
+                                    <option v-for="f in families" :key="f" :value="f">{{ f }}</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">تصفية حسب المركز</label>
+                                <select v-model="assignmentFilterCenter" class="w-full">
+                                    <option value="">كل المراكز</option>
+                                    <option v-for="c in centers" :key="c" :value="c">{{ c }}</option>
+                                </select>
+                            </div>
+                            
+                            <button @click="assignElectors" :disabled="!selectedMember" class="btn btn-success w-full">
+                                توزيع الناخبين المختارين
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reports View -->
+            <div v-else-if="currentView === 'reports' && isLoggedIn" class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800">التقارير</h2>
+                
+                <!-- Tabs -->
+                <div class="flex gap-2 border-b border-gray-200">
+                    <button @click="reportTab = 'families'" :class="['py-2 px-4 font-medium', reportTab === 'families' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500']">
+                        تقرير العائلات
+                    </button>
+                    <button @click="reportTab = 'centers'" :class="['py-2 px-4 font-medium', reportTab === 'centers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500']">
+                        تقرير المراكز
+                    </button>
+                    <button @click="reportTab = 'members'" :class="['py-2 px-4 font-medium', reportTab === 'members' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500']">
+                        تقرير الأعضاء
+                    </button>
+                </div>
+                
+                <!-- Families Report -->
+                <div v-if="reportTab === 'families'" class="card overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">العائلة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الإجمالي</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">مضمون</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">غير مضمون</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">لم يصوت</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">نسبة المضمونين</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="family in familyReport" :key="family.family_name" class="table-row border-b border-gray-100">
+                                <td class="py-3 px-4 font-semibold">{{ family.family_name }}</td>
+                                <td class="py-3 px-4">{{ family.total }}</td>
+                                <td class="py-3 px-4 text-green-600">{{ family.guaranteed }}</td>
+                                <td class="py-3 px-4 text-orange-600">{{ family.unguaranteed }}</td>
+                                <td class="py-3 px-4 text-red-600">{{ family.not_voted }}</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full bg-green-500" :style="{ width: family.guaranteed_percentage + '%' }"></div>
+                                        </div>
+                                        <span class="text-sm">{{ family.guaranteed_percentage }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="familyReport.length === 0">
+                                <td colspan="6" class="py-8 text-center text-gray-500">
+                                    لا توجد بيانات
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Centers Report -->
+                <div v-if="reportTab === 'centers'" class="card overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">المركز</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الإجمالي</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">مضمون</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">غير مضمون</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">لم يصوت</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">نسبة المضمونين</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="center in centerReport" :key="center.center" class="table-row border-b border-gray-100">
+                                <td class="py-3 px-4 font-semibold">{{ center.center }}</td>
+                                <td class="py-3 px-4">{{ center.total }}</td>
+                                <td class="py-3 px-4 text-green-600">{{ center.guaranteed }}</td>
+                                <td class="py-3 px-4 text-orange-600">{{ center.unguaranteed }}</td>
+                                <td class="py-3 px-4 text-red-600">{{ center.not_voted }}</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full bg-green-500" :style="{ width: center.guaranteed_percentage + '%' }"></div>
+                                        </div>
+                                        <span class="text-sm">{{ center.guaranteed_percentage }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="centerReport.length === 0">
+                                <td colspan="6" class="py-8 text-center text-gray-500">
+                                    لا توجد بيانات
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Members Report -->
+                <div v-if="reportTab === 'members'" class="card overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الاسم</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">العائلة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">مكلف</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">مكتمل</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">متبقي</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">نسبة الإنجاز</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="member in memberReport" :key="member.user_id" class="table-row border-b border-gray-100">
+                                <td class="py-3 px-4 font-semibold">{{ member.user_name }}</td>
+                                <td class="py-3 px-4">{{ member.family_name || '-' }}</td>
+                                <td class="py-3 px-4">{{ member.assigned }}</td>
+                                <td class="py-3 px-4 text-green-600">{{ member.completed }}</td>
+                                <td class="py-3 px-4 text-orange-600">{{ member.pending }}</td>
+                                <td class="py-3 px-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                            <div class="h-full bg-blue-500" :style="{ width: member.completion_percentage + '%' }"></div>
+                                        </div>
+                                        <span class="text-sm">{{ member.completion_percentage }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="memberReport.length === 0">
+                                <td colspan="6" class="py-8 text-center text-gray-500">
+                                    لا توجد بيانات
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Status Update Modal -->
+        <div v-if="showStatusModal" class="modal-overlay" @click.self="showStatusModal = false">
+            <div class="modal-content p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">تحديث حالة الناخب</h3>
+                
+                <div v-if="selectedElector" class="space-y-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <p class="font-semibold">{{ selectedElector.full_name }}</p>
+                        <p class="text-sm text-gray-500">{{ selectedElector.family_name }} - {{ selectedElector.electoral_center }}</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">الحالة الجديدة</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center p-3 border-2 border-green-500 rounded-lg cursor-pointer bg-green-50">
+                                <input type="radio" v-model="newStatus" value="guaranteed" class="ml-2">
+                                <span class="text-green-700">✓ مضمون (انخب قائمتنا)</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-orange-500 rounded-lg cursor-pointer">
+                                <input type="radio" v-model="newStatus" value="unguaranteed" class="ml-2">
+                                <span class="text-orange-700">✗ غير مضمون (انخب قائمة أخرى)</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-red-500 rounded-lg cursor-pointer">
+                                <input type="radio" v-model="newStatus" value="not_voted" class="ml-2">
+                                <span class="text-red-700">لم يصوت</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                        <textarea v-model="newNotes" rows="3" placeholder="ملاحظات إضافية..."></textarea>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button @click="updateStatus" class="btn btn-success flex-1">
+                            تأكيد
+                        </button>
+                        <button @click="showStatusModal = false" class="btn bg-gray-200 flex-1">
+                            إلغاء
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Member Modal -->
+        <div v-if="showAddMemberModal" class="modal-overlay" @click.self="showAddMemberModal = false">            <div class="modal-content p-6 max-h-[90vh] overflow-y-auto">                <h3 class="text-xl font-bold text-gray-800 mb-4">إضافة عضو لجنة وتوزيع المهام</h3>                <div class="space-y-4">                    <div>                        <label class="block text-sm font-medium text-gray-700 mb-1">الاسم</label>                        <input v-model="newMember.name" type="text" placeholder="اسم عضو اللجنة" class="w-full">                    </div>                    <div>                        <label class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>                        <input v-model="newMember.email" type="email" placeholder="email@example.com" class="w-full">                    </div>                    <div>                        <label class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>                        <input v-model="newMember.password" type="password" placeholder="••••••••" class="w-full">                    </div>                    <div class="grid grid-cols-2 gap-4">                        <div>                            <label class="block text-sm font-medium text-gray-700 mb-1">العائلة المشرف عليها</label>                            <select v-model="newMember.family_name" class="w-full">                                <option value="">كل العائلات</option>                                <option v-for="f in families" :key="f" :value="f">{{ f }}</option>                            </select>                        </div>                        <div>                            <label class="block text-sm font-medium text-gray-700 mb-1">المركز الانتخابي</label>                            <select v-model="newMember.electoral_center" class="w-full">                                <option value="">كل المراكز</option>                                <option v-for="c in centers" :key="c" :value="c">{{ c }}</option>                            </select>                        </div>                    </div>                    <div class="bg-blue-50 p-4 rounded-lg">                        <h4 class="font-semibold text-gray-800 mb-3">خيارات توزيع المهام</h4>                                                <div class="space-y-3">                            <div>                                <label class="block text-sm font-medium text-gray-700 mb-1">تصفية الناخبين للتوزيع</label>                                <select v-model="distFilterFamily" class="w-full mb-2">                                    <option value="">كل العائلات</option>                                    <option v-for="f in families" :key="f" :value="f">{{ f }}</option>                                </select>                                <select v-model="distFilterCenter" class="w-full">                                    <option value="">كل المراكز</option>                                    <option v-for="c in centers" :key="c" :value="c">{{ c }}</option>                                </select>                            </div>                                                        <div class="flex items-center gap-2">                                <input type="checkbox" v-model="assignImmediately" id="assignImmediately" class="w-4 h-4">                                <label for="assignImmediately" class="text-sm text-gray-700">توزيع الناخبين المفلترين على العضو الجديد</label>                            </div>                                                        <p v-if="filteredUnassignedCount > 0" class="text-sm text-gray-600">                                عدد الناخبين المتاحين للتوزيع: <span class="font-bold text-blue-600">{{ filteredUnassignedCount }}</span>                            </p>                        </div>                    </div>                    <div class="flex gap-2">                        <button @click="addCommitteeMember" class="btn btn-primary flex-1">                            إضافة العضو وتوزيع المهام                        </button>                        <button @click="showAddMemberModal = false" class="btn bg-gray-200 flex-1">                            إلغاء                        </button>                    </div>                </div>            </div>        </div>    </div>                </div>
+            </div>
+        </div>
+    </div>
+
+            <!-- Member Dashboard View -->
+            <div v-else-if="currentView === 'member-dashboard' && isLoggedIn" class="space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800">ناخباني</h2>
+                
+                <!-- Member Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="card p-4">
+                        <p class="text-sm text-gray-500">إجمالي المكلفين</p>
+                        <p class="text-2xl font-bold text-blue-600">{{ memberStats.total }}</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-sm text-gray-500">مضمون</p>
+                        <p class="text-2xl font-bold text-green-600">{{ memberStats.guaranteed }}</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-sm text-gray-500">غير مضمون</p>
+                        <p class="text-2xl font-bold text-orange-600">{{ memberStats.not_guaranteed }}</p>
+                    </div>
+                    <div class="card p-4">
+                        <p class="text-sm text-gray-500">لم يصوت</p>
+                        <p class="text-2xl font-bold text-red-600">{{ memberStats.not_voted }}</p>
+                    </div>
+                </div>
+
+                <!-- My Electors Table -->
+                <div class="card overflow-hidden">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">ناخباني المكلفين</h3>
+                    
+                    <!-- Filters -->
+                    <div class="flex gap-4 mb-4">
+                        <input v-model="memberElectorsSearch" type="text" placeholder="بحث بالاسم أو الرمز" class="flex-1">
+                        <select v-model="memberFilterFamily" class="w-48">
+                            <option value="">كل العائلات</option>
+                            <option v-for="f in memberFamilies" :key="f" :value="f">{{ f }}</option>
+                        </select>
+                        <select v-model="memberFilterStatus" class="w-40">
+                            <option value="">كل الحالات</option>
+                            <option value="guaranteed">مضمون</option>
+                            <option value="not_guaranteed">غير مضمون</option>
+                            <option value="not_voted">لم يصوت</option>
+                        </select>
+                    </div>
+
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الاسم</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">العائلة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">المركز</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الرمز</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">الحالة</th>
+                                <th class="text-right py-3 px-4 font-semibold text-gray-600">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="elector in memberFilteredElectors" :key="elector.id" class="border-t border-gray-100 hover:bg-gray-50">
+                                <td class="py-3 px-4">{{ elector.full_name }}</td>
+                                <td class="py-3 px-4">{{ elector.family_name }}</td>
+                                <td class="py-3 px-4">{{ elector.electoral_center }}</td>
+                                <td class="py-3 px-4">{{ elector.electoral_code }}</td>
+                                <td class="py-3 px-4">
+                                    <span :class="{'text-green-600': elector.status === 'guaranteed', 'text-orange-600': elector.status === 'not_guaranteed', 'text-red-600': elector.status === 'not_voted'}">
+                                        {{ getStatusLabel(elector.status) }}
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4">
+                                    <button @click="openMemberStatusModal(elector)" class="text-blue-600 hover:underline">
+                                        تحديث الحالة
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="memberFilteredElectors.length === 0">
+                                <td colspan="6" class="py-8 text-center text-gray-500">
+                                    لا توجد ناخبين مكلفين
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Update Status Modal for Members -->
+                <div v-if="showMemberStatusModal" class="modal-overlay" @click.self="showMemberStatusModal = false">
+                    <div class="modal-content p-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">تحديث حالة الناخب</h3>
+                        
+                        <div class="mb-4 p-3 bg-gray-50 rounded">
+                            <p class="font-semibold">{{ selectedMemberElector?.full_name }}</p>
+                            <p class="text-sm text-gray-500">{{ selectedMemberElector?.family_name }} - {{ selectedMemberElector?.electoral_code }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3 mb-4">
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-green-500" :class="{'border-green-500 bg-green-50': newStatus === 'guaranteed'}">
+                                <input type="radio" v-model="newStatus" value="guaranteed" class="ml-2">
+                                <span class="text-green-700">مضمون</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-orange-500" :class="{'border-orange-500 bg-orange-50': newStatus === 'not_guaranteed'}">
+                                <input type="radio" v-model="newStatus" value="not_guaranteed" class="ml-2">
+                                <span class="text-orange-700">غير مضمون</span>
+                            </label>
+                            <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-red-500" :class="{'border-red-500 bg-red-50': newStatus === 'not_voted'}">
+                                <input type="radio" v-model="newStatus" value="not_voted" class="ml-2">
+                                <span class="text-red-700">لم يصوت</span>
+                            </label>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+                            <textarea v-model="newNotes" rows="3" placeholder="ملاحظات إضافية" class="w-full"></textarea>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button @click="updateMemberElectorStatus" class="btn btn-success flex-1">
+                                تأكيد
+                            </button>
+                            <button @click="showMemberStatusModal = false" class="btn bg-gray-200 flex-1">
+                                إلغاء
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    
+    <script>
+        const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+        
+        createApp({
+            setup() {
+                // Navigation
+                const navItems = computed(() => {
+                    if (!currentUser.value) return [];
+                    if (currentUser.value.role === 'admin') {
+                        return [
+                            { id: 'dashboard', label: 'لوحة التحكم' },
+                            { id: 'electors', label: 'الناخبين' },
+                            { id: 'import', label: 'استيراد Excel' },
+                            { id: 'assignment', label: 'توزيع المهام' },
+                            { id: 'reports', label: 'التقارير' }
+                        ];
+                    } else {
+                        return [
+                            { id: 'member-dashboard', label: 'ناخباني' }
+                        ];
+                    }
+                });
+                
+                const currentView = ref('login');
+                const showMobileMenu = ref(false);
+                const isLoggedIn = ref(false);
+                const currentUser = ref(null);
+
+                // Login form
+                const loginForm = ref({
+                    email: '',
+                    password: ''
+                });
+                const loginError = ref('');
+
+                // Login function
+                const login = async () => {
+                    try {
+                        const res = await fetch('/api/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(loginForm.value)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            isLoggedIn.value = true;
+                            currentUser.value = data.user;
+                            loginError.value = '';
+                            
+                            // Save credentials to localStorage
+                            localStorage.setItem('user_email', loginForm.value.email);
+                            localStorage.setItem('user_password', loginForm.value.password);
+                            
+                            // Set view based on role
+                            if (data.user.role === 'admin') {
+                                currentView.value = 'dashboard';
+                                await loadDashboard();
+                                await loadElectors();
+                                await loadCommitteeMembers();
+                            } else {
+                                currentView.value = 'member-dashboard';
+                                await loadMemberElectors();
+                            }
+                        } else {
+                            const err = await res.json();
+                            loginError.value = err.detail || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+                        }
+                    } catch (e) {
+                        loginError.value = 'حدث خطأ في الاتصال';
+                    }
+                };
+
+                // Check auth on mount
+                const checkAuth = async () => {
+                    const storedEmail = localStorage.getItem('user_email');
+                    const storedPassword = localStorage.getItem('user_password');
+                    
+                    if (storedEmail && storedPassword) {
+                        try {
+                            const res = await fetch('/api/me', {
+                                headers: {
+                                    'Authorization': 'Basic ' + btoa(storedEmail + ':' + storedPassword)
+                                }
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                isLoggedIn.value = true;
+                                currentUser.value = data;
+                                currentView.value = 'dashboard';
+                            } else {
+                                localStorage.removeItem('user_email');
+                                localStorage.removeItem('user_password');
+                            }
+                        } catch (e) {
+                            localStorage.removeItem('user_email');
+                            localStorage.removeItem('user_password');
+                        }
+                    }
+                };
+
+                const logout = async () => {
+                    localStorage.removeItem('user_email');
+                    localStorage.removeItem('user_password');
+                    isLoggedIn.value = false;
+                    currentUser.value = null;
+                    currentView.value = 'login';
+                };
+                
+                // Stats
+                const stats = ref({
+                    total_electors: 0,
+                    guaranteed: 0,
+                    ununuranted: 0,
+                    not_voted: 0,
+                    pending: 0,
+                    guaranteed_percentage: 0,
+                    family_breakdown: [],
+                    center_breakdown: []
+                });
+                
+                const recentElectors = ref([]);
+                
+                // Electors
+                const electors = ref([]);
+                const families = ref([]);
+                const centers = ref([]);
+                const electorsSearch = ref('');
+                const electorsFilterFamily = ref('');
+                const electorsFilterStatus = ref('');
+                
+                const filteredElectors = computed(() => {
+                    let result = electors.value;
+                    
+                    if (electorsSearch.value) {
+                        const search = electorsSearch.value.toLowerCase();
+                        result = result.filter(e => 
+                            e.full_name.toLowerCase().includes(search) ||
+                            e.electoral_code.toLowerCase().includes(search)
+                        );
+                    }
+                    
+                    if (electorsFilterFamily.value) {
+                        result = result.filter(e => e.family_name === electorsFilterFamily.value);
+                    }
+                    
+                    if (electorsFilterStatus.value) {
+                        result = result.filter(e => e.status === electorsFilterStatus.value);
+                    }
+                    
+                    return result;
+                });
+
+                // Computed for filtered unassigned count
+                const filteredUnassignedCount = computed(() => {
+                    return unassignedElectors.value.filter(e => {
+                        if (distFilterFamily.value && e.family_name !== distFilterFamily.value) return false;
+                        if (distFilterCenter.value && e.electoral_center !== distFilterCenter.value) return false;
+                        return true;
+                    }).length;
+                });
+                
+                // Computed for member filtered electors
+                const memberFilteredElectors = computed(() => {
+                    let result = memberElectors.value;
+                    
+                    if (memberElectorsSearch.value) {
+                        const search = memberElectorsSearch.value.toLowerCase();
+                        result = result.filter(e => 
+                            e.full_name.toLowerCase().includes(search) ||
+                            e.electoral_code.toLowerCase().includes(search)
+                        );
+                    }
+                    
+                    if (memberFilterFamily.value) {
+                        result = result.filter(e => e.family_name === memberFilterFamily.value);
+                    }
+                    
+                    if (memberFilterStatus.value) {
+                        result = result.filter(e => e.status === memberFilterStatus.value);
+                    }
+                    
+                    return result;
+                });
+                
+                // Import
+                const importFile = ref(null);
+                const importResult = ref(null);
+                
+                // Edit Member Functions
+                const openEditMemberModal = (member) => {
+                    editMember.value = { 
+                        id: member.id,
+                        name: member.name, 
+                        email: member.email, 
+                        password: '',
+                        family_name: member.family_name || '',
+                        electoral_center: member.electoral_center || ''
+                    };
+                    showEditMemberModal.value = true;
+                };
+                
+                const saveMemberChanges = async () => {
+                    try {
+                        const updateData = { 
+                            name: editMember.value.name,
+                            email: editMember.value.email,
+                            family_name: editMember.value.family_name,
+                            electoral_center: editMember.value.electoral_center
+                        };
+                        
+                        if (editMember.value.password) {
+                            updateData.password = editMember.value.password;
+                        }
+                        
+                        const res = await fetch(`/api/users/${editMember.value.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updateData)
+                        });
+                        
+                        if (res.ok) {
+                            showEditMemberModal.value = false;
+                            await loadCommitteeMembers();
+                            alert('تم تحديث البيانات بنجاح');
+                        } else {
+                            const err = await res.json();
+                            alert(err.detail || 'حدث خطأ في التحديث');
+                        }
+                    } catch (e) {
+                        console.error('Error saving member:', e);
+                    }
+                };
+
+                // Assignment
+                const committeeMembers = ref([]);
+                const selectedMember = ref(null);
+                const assignmentFilterFamily = ref('');
+                const assignmentFilterCenter = ref('');
+                
+                // Status Modal
+                const showStatusModal = ref(false);
+                const selectedElector = ref(null);
+                const newStatus = ref('guaranteed');
+                const newNotes = ref('');
+                
+                // Add Member Modal
+                const showAddMemberModal = ref(false);
+                const newMember = ref({ name: '', email: '', password: '', family_name: '', electoral_center: '' });
+                const distFilterFamily = ref('');
+                const distFilterCenter = ref('');
+                const assignImmediately = ref(false);
+                const unassignedElectors = ref([]);
+                
+                // Edit Member Modal
+                const showEditMemberModal = ref(false);
+                const editMember = ref({ id: null, name: '', email: '', password: '', family_name: '', electoral_center: '' });
+                
+                // Reports
+                const reportTab = ref('families');
+                const familyReport = ref([]);
+                const centerReport = ref([]);
+                const memberReport = ref([]);
+                
+                // Member Dashboard
+                const memberElectors = ref([]);
+                const memberElectorsSearch = ref('');
+                const memberFilterFamily = ref('');
+                const memberFilterStatus = ref('');
+                const showMemberStatusModal = ref(false);
+                const selectedMemberElector = ref(null);
+                const memberStats = ref({ total: 0, guaranteed: 0, not_guaranteed: 0, not_voted: 0 });
+                const memberFamilies = ref([]);
+                
+                // Charts
+                let statusChart = null;
+                let familyChart = null;
+                
+                // Functions
+                const getStatusLabel = (status) => {
+                    const labels = {
+                        'pending': 'في الانتظار',
+                        'guaranteed': 'مضمون',
+                        'unguaranteed': 'غير مضمون',
+                        'not_voted': 'لم يصوت'
+                    };
+                    return labels[status] || status;
+                };
+                
+                const loadDashboard = async () => {
+                    try {
+                        const res = await fetch('/api/dashboard');
+                        stats.value = await res.json();
+                        updateCharts();
+                    } catch (e) {
+                        console.error('Error loading dashboard:', e);
+                    }
+                };
+                
+                const loadElectors = async () => {
+                    try {
+                        const res = await fetch('/api/electors?limit=1000');
+                        const data = await res.json();
+                        electors.value = data;
+                        families.value = [...new Set(data.map(e => e.family_name))];
+                        centers.value = [...new Set(data.map(e => e.electoral_center))];
+                        recentElectors.value = data.slice(-10).reverse();
+                        // Get unassigned electors for task distribution
+                        unassignedElectors.value = data.filter(e => !e.assigned_to);
+                    } catch (e) {
+                        console.error('Error loading electors:', e);
+                    }
+                };
+                
+                const loadCommitteeMembers = async () => {
+                    try {
+                        const res = await fetch('/api/users');
+                        const data = await res.json();
+                        
+                        // Get assignment counts for each member
+                        for (const member of data) {
+                            const assignedRes = await fetch(`/api/electors?assigned_to=${member.id}&limit=1`);
+                            const assignedData = await assignedRes.json();
+                            member.assigned = assignedData.length > 0 ? assignedData[0]._total || 0 : 0;
+                        }
+                        
+                        committeeMembers.value = data;
+                    } catch (e) {
+                        console.error('Error loading members:', e);
+                    }
+                };
+                
+                const loadReports = async () => {
+                    try {
+                        const [familyRes, centerRes, memberRes] = await Promise.all([
+                            fetch('/api/reports/families'),
+                            fetch('/api/reports/centers'),
+                            fetch('/api/reports/members')
+                        ]);
+                        
+                        familyReport.value = await familyRes.json();
+                        centerReport.value = await centerRes.json();
+                        memberReport.value = await memberRes.json();
+                    } catch (e) {
+                        console.error('Error loading reports:', e);
+                    }
+                };
+                
+                const updateCharts = () => {
+                    nextTick(() => {
+                        const ctx1 = document.getElementById('statusChart');
+                        const ctx2 = document.getElementById('familyChart');
+                        
+                        if (ctx1) {
+                            if (statusChart) statusChart.destroy();
+                            statusChart = new Chart(ctx1, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: ['مضمون', 'غير مضمون', 'لم يصوت', 'في الانتظار'],
+                                    datasets: [{
+                                        data: [
+                                            stats.value.guaranteed,
+                                            stats.value.unguaranteed,
+                                            stats.value.not_voted,
+                                            stats.value.pending
+                                        ],
+                                        backgroundColor: ['#10b981', '#f97316', '#dc2626', '#94a3b8']
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom'
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if (ctx2 && stats.value.family_breakdown.length > 0) {
+                            if (familyChart) familyChart.destroy();
+                            familyChart = new Chart(ctx2, {
+                                type: 'bar',
+                                data: {
+                                    labels: stats.value.family_breakdown.map(f => f.family_name),
+                                    datasets: [{
+                                        label: 'المضمونين',
+                                        data: stats.value.family_breakdown.map(f => f.guaranteed),
+                                        backgroundColor: '#10b981'
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: { display: false }
+                                    },
+                                    scales: {
+                                        y: { beginAtZero: true }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                };
+                
+                const handleFileUpload = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    importFile.value = file;
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    try {
+                        const res = await fetch('/api/electors/import', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        importResult.value = await res.json();
+                        await loadElectors();
+                        await checkAuth(); if (isLoggedIn.value) {
+                        await loadDashboard();
+                        await loadElectors();
+                        await loadCommitteeMembers();
+                    }
+                    } catch (e) {
+                        console.error('Error importing:', e);
+                        alert('خطأ في استيراد الملف');
+                    }
+                };
+                
+                const openStatusModal = (elector) => {
+                    selectedElector.value = elector;
+                    newStatus.value = elector.status;
+                    newNotes.value = '';
+                    showStatusModal.value = true;
+                };
+                
+                const updateStatus = async () => {
+                    if (!selectedElector.value) return;
+                    
+                    try {
+                        await fetch(`/api/electors/${selectedElector.value.id}/status`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: newStatus.value,
+                                notes: newNotes.value
+                            })
+                        });
+                        
+                        showStatusModal.value = false;
+                        await loadElectors();
+                        await checkAuth(); if (isLoggedIn.value) {
+                        await loadDashboard();
+                        await loadElectors();
+                        await loadCommitteeMembers();
+                    }
+                    } catch (e) {
+                        console.error('Error updating status:', e);
+                    }
+                };
+                
+
+                // Member Dashboard Functions
+                const loadMemberElectors = async () => {
+                    if (!currentUser.value || currentUser.value.role === 'admin') return;
+                    
+                    try {
+                        const res = await fetch('/api/me/electors');
+                        const data = await res.json();
+                        memberElectors.value = data;
+                        
+                        // Calculate stats
+                        memberStats.value = {
+                            total: data.length,
+                            guaranteed: data.filter(e => e.status === 'guaranteed').length,
+                            not_guaranteed: data.filter(e => e.status === 'not_guaranteed').length,
+                            not_voted: data.filter(e => e.status === 'not_voted').length
+                        };
+                        
+                        // Get unique families
+                        memberFamilies.value = [...new Set(data.map(e => e.family_name))];
+                    } catch (e) {
+                        console.error('Error loading member electors:', e);
+                    }
+                };
+                
+                const openMemberStatusModal = (elector) => {
+                    selectedMemberElector.value = elector;
+                    newStatus.value = elector.status;
+                    newNotes.value = elector.notes || '';
+                    showMemberStatusModal.value = true;
+                };
+                
+                const updateMemberElectorStatus = async () => {
+                    if (!selectedMemberElector.value) return;
+                    
+                    try {
+                        await fetch(`/api/electors/${selectedMemberElector.value.id}/status`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: newStatus.value,
+                                notes: newNotes.value
+                            })
+                        });
+                        
+                        showMemberStatusModal.value = false;
+                        await loadMemberElectors();
+                    } catch (e) {
+                        console.error('Error updating status:', e);
+                    }
+                };
+
+                const assignElectors = async () => {
+                    if (!selectedMember.value) return;
+                    
+                    try {
+                        await fetch('/api/electors/assign-bulk', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                user_id: selectedMember.value.id,
+                                family_name: assignmentFilterFamily.value || null,
+                                center: assignmentFilterCenter.value || null
+                            })
+                        });
+                        
+                        await loadCommitteeMembers();
+                        await loadElectors();
+                    } catch (e) {
+                        console.error('Error assigning:', e);
+                    }
+                };
+                
+                const addCommitteeMember = async () => {
+                    try {
+                        // First create the user
+                        const res = await fetch('/api/users', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newMember.value)
+                        });
+
+                        if (!res.ok) {
+                            const err = await res.json();
+                            alert(err.detail || 'حدث خطأ في إنشاء العضو');
+                            return;
+                        }
+
+                        const newUser = await res.json();
+
+                        // If assignImmediately is checked, distribute electors
+                        if (assignImmediately.value) {
+                            // Get filtered unassigned electors
+                            const filtered = unassignedElectors.value.filter(e => {
+                                if (distFilterFamily.value && e.family_name !== distFilterFamily.value) return false;
+                                if (distFilterCenter.value && e.electoral_center !== distFilterCenter.value) return false;
+                                return true;
+                            });
+
+                            // Assign each elector to the new member
+                            for (const elector of filtered) {
+                                await fetch(`/api/electors/${elector.id}/assign`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ user_id: newUser.id })
+                                });
+                            }
+                        }
+
+                        showAddMemberModal.value = false;
+                        newMember.value = { name: '', email: '', password: '', family_name: '', electoral_center: '' };
+                        distFilterFamily.value = '';
+                        distFilterCenter.value = '';
+                        assignImmediately.value = false;
+                        await loadCommitteeMembers();
+                        await loadElectors();
+                    } catch (e) {
+                        console.error('Error adding member:', e);
+                    }
+                };ly_name: '' };
+                        await loadCommitteeMembers();
+                    } catch (e) {
+                        console.error('Error adding member:', e);
+                    }
+                };
+                
+                // Watch for view changes
+                watch(currentView, async (newView) => {
+                    if (newView === 'dashboard') {
+                        await checkAuth(); if (isLoggedIn.value) {
+                        await loadDashboard();
+                        await loadElectors();
+                        await loadCommitteeMembers();
+                    }
+                    } else if (newView === 'electors') {
+                        await loadElectors();
+                    } else if (newView === 'assignment') {
+                        await loadCommitteeMembers();
+                    } else if (newView === 'reports') {
+                        await loadReports();
+                    }
+                });
+                
+                // Initialize
+                onMounted(async () => {
+                    await checkAuth(); if (isLoggedIn.value) {
+                        await loadDashboard();
+                        await loadElectors();
+                        await loadCommitteeMembers();
+                    }
+                    await loadElectors();
+                    await loadCommitteeMembers();
+                });
+                
+                return {
+                    navItems,
+                    currentView,
+                    showMobileMenu,
+                    isLoggedIn,
+                    currentUser,
+                    loginForm,
+                    loginError,
+                    login,
+                    logout,
+                    stats,
+                    recentElectors,
+                    electors,
+                    families,
+                    centers,
+                    electorsSearch,
+                    electorsFilterFamily,
+                    electorsFilterStatus,
+                    filteredElectors,
+                    importFile,
+                    importResult,
+                    committeeMembers,
+                    selectedMember,
+                    assignmentFilterFamily,
+                    assignmentFilterCenter,
+                    showStatusModal,
+                    selectedElector,
+                    newStatus,
+                    newNotes,
+                    showAddMemberModal,
+                    newMember,
+                    showEditMemberModal,
+                    editMember,
+                    distFilterFamily,
+                    distFilterCenter,
+                    assignImmediately,
+                    unassignedElectors,
+                    filteredUnassignedCount,
+                    reportTab,
+                    familyReport,
+                    centerReport,
+                    memberReport,
+                    getStatusLabel,
+                    handleFileUpload,
+                    openStatusModal,
+                    updateStatus,
+                    assignElectors,
+                    addCommitteeMember,
+                    // Member Dashboard
+                    memberElectors,
+                    memberElectorsSearch,
+                    memberFilterFamily,
+                    memberFilterStatus,
+                    showMemberStatusModal,
+                    selectedMemberElector,
+                    memberStats,
+                    memberFamilies,
+                    memberFilteredElectors,
+                    loadMemberElectors,
+                    openMemberStatusModal,
+                    updateMemberElectorStatus,
+                    openEditMemberModal,
+                    saveMemberChanges
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
