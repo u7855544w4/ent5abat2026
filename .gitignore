@@ -1,0 +1,16 @@
+*.pyc
+__pycache__/
+*.log
+*.db
+election.db
+node_modules/
+.env
+.DS_Store
+static/index_backup.html
+static/index_fresh.html
+static/index_original.html
+static/index_full_debug.html
+static/index.html.bak
+static/test*.html
+static/simple_test.html
+
