@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-header animate-in">
+    <h3 class="mb-0">
+        <i class="fas fa-tachometer-alt me-2 text-primary"></i>
+        لوحة التحكم - داش بورد
+    </h3>
+    <p class="text-muted mb-0 mt-1">نظرة عامة على حالة选举 الناخبين</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-xl-3 animate-in animate-delay-1">
+        <div class="stat-card bg-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-value text-primary">{{ total_voters }}</div>
+                        <div class="stat-label">إجمالي الناخبين</div>
+                    </div>
+                    <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-xl-3 animate-in animate-delay-2">
+        <div class="stat-card bg-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-value text-success">{{ positive }}</div>
+                        <div class="stat-label">مضمون ✅</div>
+                    </div>
+                    <div class="stat-icon bg-success bg-opacity-10 text-success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-xl-3 animate-in animate-delay-3">
+        <div class="stat-card bg-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-value text-warning">{{ uncertain }}</div>
+                        <div class="stat-label">غير مضمون ⚠️</div>
+                    </div>
+                    <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-xl-3 animate-in animate-delay-4">
+        <div class="stat-card bg-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="stat-value text-danger">{{ negative }}</div>
+                        <div class="stat-label">لم ينخب ❌</div>
+                    </div>
+                    <div class="stat-icon bg-danger bg-opacity-10 text-danger">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card card-custom">
+            <div class="card-header-custom">
+                <i class="fas fa-chart-pie me-2"></i>
+                حالة选举
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card card-custom">
+            <div class="card-header-custom">
+                <i class="fas fa-chart-bar me-2"></i>
+                نسبة选举
+            </div>
+            <div class="card-body">
+                <canvas id="percentageChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tables Row -->
+<div class="row g-4">
+    <!-- Family Stats -->
+    <div class="col-lg-6">
+        <div class="card card-custom">
+            <div class="card-header-custom">
+                <i class="fas fa-users-rectangle me-2"></i>
+                إحصائيات حسب العائلة
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-custom table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>العائلة</th>
+                                <th class="text-center">الإجمالي</th>
+                                <th class="text-center text-success">مضمون</th>
+                                <th class="text-center text-warning">غير مضمون</th>
+                                <th class="text-center text-danger">لم ينخب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for family in family_stats %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('voters', family=family['family_name']) }}" class="text-decoration-none text-primary fw-bold">
+                                        {{ family['family_name'] }}
+                                    </a>
+                                </td>
+                                <td class="text-center">{{ family['total'] }}</td>
+                                <td class="text-center text-success">{{ family['positive'] }}</td>
+                                <td class="text-center text-warning">{{ family['uncertain'] }}</td>
+                                <td class="text-center text-danger">{{ family['negative'] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">لا توجد بيانات</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Center Stats -->
+    <div class="col-lg-6">
+        <div class="card card-custom">
+            <div class="card-header-custom">
+                <i class="fas fa-building me-2"></i>
+                إحصائيات حسب المركز انتخابي
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-custom table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>المركز انتخابي</th>
+                                <th class="text-center">الإجمالي</th>
+                                <th class="text-center text-success">مضمون</th>
+                                <th class="text-center text-warning">غير مضمون</th>
+                                <th class="text-center text-danger">لم ينخب</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for center in center_stats %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('voters', center=center['electoral_center']) }}" class="text-decoration-none text-primary fw-bold">
+                                        {{ center['electoral_center'] }}
+                                    </a>
+                                </td>
+                                <td class="text-center">{{ center['total'] }}</td>
+                                <td class="text-center text-success">{{ center['positive'] }}</td>
+                                <td class="text-center text-warning">{{ center['uncertain'] }}</td>
+                                <td class="text-center text-danger">{{ center['negative'] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">لا توجد بيانات</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Committee Stats -->
+<div class="row g-4 mt-2">
+    <div class="col-12">
+        <div class="card card-custom">
+            <div class="card-header-custom">
+                <i class="fas fa-clipboard-list me-2"></i>
+                أداء اللجان
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-custom table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>اللجنة</th>
+                                <th class="text-center">المassigned الناخبين</th>
+                                <th class="text-center text-success">مضمون</th>
+                                <th class="text-center text-warning">غير مضمون</th>
+                                <th class="text-center text-danger">لم ينخب</th>
+                                <th class="text-center text-muted">قيد الانتظار</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for committee in committee_stats %}
+                            <tr>
+                                <td class="fw-bold">{{ committee['name'] }}</td>
+                                <td class="text-center">{{ committee['total'] }}</td>
+                                <td class="text-center text-success">{{ committee['positive'] }}</td>
+                                <td class="text-center text-warning">{{ committee['uncertain'] }}</td>
+                                <td class="text-center text-danger">{{ committee['negative'] }}</td>
+                                <td class="text-center text-muted">{{ committee['pending'] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">لا توجد لجان</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Status Pie Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['مضمون', 'غير مضمون', 'لم ينخب', 'قيد الانتظار'],
+            datasets: [{
+                data: [{{ positive }}, {{ uncertain }}, {{ negative }}, {{ pending }}],
+                backgroundColor: ['#28a745', '#f59e0b', '#dc2626', '#94a3b8'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: { family: 'Cairo', size: 12 },
+                        padding: 20
+                    }
+                }
+            }
+        }
+    });
+    
+    // Percentage Bar Chart
+    const percentageCtx = document.getElementById('percentageChart').getContext('2d');
+    new Chart(percentageCtx, {
+        type: 'bar',
+        data: {
+            labels: ['مضمون', 'غير مضمون', 'لم ينخب', 'قيد الانتظار'],
+            datasets: [{
+                label: 'النسبة',
+                data: [
+                    {{ (positive/total_voters*100)|round(1) if total_voters > 0 else 0 }},
+                    {{ (uncertain/total_voters*100)|round(1) if total_voters > 0 else 0 }},
+                    {{ (negative/total_voters*100)|round(1) if total_voters > 0 else 0 }},
+                    {{ (pending/total_voters*100)|round(1) if total_voters > 0 else 0 }}
+                ],
+                backgroundColor: ['#28a745', '#f59e0b', '#dc2626', '#94a3b8'],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) { return value + '%' },
+                        font: { family: 'Cairo' }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) { return context.parsed.y + '%' }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
