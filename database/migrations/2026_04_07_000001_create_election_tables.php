@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -21,7 +22,7 @@ return new class extends Migration
             $table->string('family_name')->nullable();
             $table->string('electoral_code')->nullable();
             $table->string('electoral_center')->nullable();
-            $table->enum('status', ['pending', 'positive', 'uncertain', 'negative'])->default('pending');
+            $table->string('status')->default('pending');
             $table->foreignId('committee_id')->nullable()->constrained('committees')->nullOnDelete();
             $table->string('follower_name')->nullable();
             $table->date('follow_date')->nullable();
